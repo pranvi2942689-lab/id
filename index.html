@@ -148,7 +148,21 @@
       right: false,
     };
 
-    let lastTimestamp = performance.now();
+    const KEY_BINDINGS = {
+      ShiftLeft: "shift",
+      ShiftRight: "shift",
+      Shift: "shift",
+      ArrowLeft: "left",
+      ArrowRight: "right",
+      Left: "left",
+      Right: "right",
+      KeyA: "left",
+      KeyD: "right",
+      a: "left",
+      d: "right",
+    };
+
+    let lastTimestamp = null;
     let deltaAccumulator = 0;
 
     const finishLine = {
@@ -371,7 +385,11 @@
     }
 
     function loop(timestamp) {
-      const delta = (timestamp - lastTimestamp) / 1000;
+      if (lastTimestamp === null) {
+        lastTimestamp = timestamp;
+      }
+
+      const delta = Math.min((timestamp - lastTimestamp) / 1000, 0.1);
       lastTimestamp = timestamp;
       deltaAccumulator += delta;
 
@@ -385,32 +403,59 @@
       requestAnimationFrame(loop);
     }
 
-    function handleKey(event, isDown) {
-      switch (event.code) {
-        case "ShiftLeft":
-        case "ShiftRight":
-          keys.shift = isDown;
-          break;
-        case "ArrowLeft":
-          keys.left = isDown;
-          break;
-        case "ArrowRight":
-          keys.right = isDown;
-          break;
-        default:
-          return;
-      }
-      event.preventDefault();
+    function resolveAction(event) {
+      const direct = KEY_BINDINGS[event.code];
+      if (direct) return direct;
+      if (!event.key) return null;
+      const lowered = event.key.toLowerCase();
+      return (
+        KEY_BINDINGS[event.key] ||
+        KEY_BINDINGS[lowered] ||
+        KEY_BINDINGS[`Key${lowered.toUpperCase()}`] ||
+        null
+      );
     }
 
-    window.addEventListener("keydown", (event) => handleKey(event, true));
-    window.addEventListener("keyup", (event) => handleKey(event, false));
+    function handleKey(event, isDown) {
+      const action = resolveAction(event);
+      if (!action || !Object.prototype.hasOwnProperty.call(keys, action)) {
+        return;
+      }
+
+      keys[action] = isDown;
+
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      (event) => handleKey(event, true),
+      { passive: false }
+    );
+    window.addEventListener(
+      "keyup",
+      (event) => handleKey(event, false),
+      { passive: false }
+    );
 
     window.addEventListener("blur", () => {
       keys.shift = keys.left = keys.right = false;
+      hideWarning();
     });
 
-    requestAnimationFrame(loop);
+    window.addEventListener(
+      "load",
+      () => {
+        lastTimestamp = null;
+        deltaAccumulator = 0;
+        render();
+        window.focus();
+        requestAnimationFrame(loop);
+      },
+      { once: true }
+    );
   </script>
 </body>
 </html>
