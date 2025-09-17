@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>迷你赛车 - HTML5 小游戏</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      color-scheme: dark light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at top, #1e1e28, #050508 70%);
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 16px 48px;
+      gap: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    .instructions {
+      max-width: 960px;
+      width: min(90vw, 960px);
+      padding: 18px 22px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(4px);
+      box-shadow: 0 18px 35px rgba(0, 0, 0, 0.3);
+      line-height: 1.55;
+    }
+
+    canvas {
+      border-radius: 22px;
+      width: min(90vw, 960px);
+      height: auto;
+      max-height: 70vh;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+      background: #0d0f1a;
+    }
+
+    .hud {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      background: rgba(0, 0, 0, 0.55);
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-size: 15px;
+      line-height: 1.4;
+      pointer-events: none;
+      box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .hud strong {
+      color: #f9d342;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .warning {
+      position: absolute;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      background: rgba(219, 68, 55, 0.88);
+      padding: 12px 26px;
+      border-radius: 999px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      display: none;
+      text-transform: uppercase;
+      box-shadow: 0 14px 34px rgba(219, 68, 55, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <h1>霓虹极速环道</h1>
+  <div class="instructions">
+    <p>
+      按住 <kbd>Shift</kbd> 启动发动机并持续前进，使用 <kbd>←</kbd>/<kbd>→</kbd>
+      控制赛车方向。完成尽可能多的圈数，保持速度的同时注意不要驶出赛道！
+    </p>
+    <p>
+      小贴士：速度越快转向越灵敏，松开 <kbd>Shift</kbd> 会逐渐减速。驶出赛道时将受到强力减速惩罚。
+    </p>
+  </div>
+
+  <canvas id="game" width="960" height="640"></canvas>
+  <div class="hud" id="hud">
+    <div>速度：<strong id="speed">0</strong> km/h</div>
+    <div>圈数：<strong id="laps">0</strong></div>
+    <div>本圈用时：<strong id="lapTime">0.0s</strong></div>
+    <div>最佳纪录：<strong id="bestLap">--</strong></div>
+  </div>
+  <div class="warning" id="warning">驶出赛道！</div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const hudSpeed = document.getElementById("speed");
+    const hudLaps = document.getElementById("laps");
+    const hudLapTime = document.getElementById("lapTime");
+    const hudBestLap = document.getElementById("bestLap");
+    const warning = document.getElementById("warning");
+
+    const trackCenter = { x: canvas.width / 2, y: canvas.height / 2 };
+    const outerRadius = 260;
+    const innerRadius = 150;
+    const startLineX = trackCenter.x + outerRadius - 60;
+    const startLineWidth = 40;
+
+    const car = {
+      x: trackCenter.x,
+      y: trackCenter.y + outerRadius - 90,
+      angle: -Math.PI / 2,
+      speed: 0,
+      targetSpeed: 0,
+      radius: 18,
+      accel: 0.12,
+      maxSpeed: 5.8,
+      turnRate: 0.042,
+      friction: 0.96,
+      lap: 0,
+      lapTime: 0,
+      bestLap: Infinity,
+      lastCheckpointAngle: null,
+    };
+
+    const keys = {
+      shift: false,
+      left: false,
+      right: false,
+    };
+
+    let lastTimestamp = performance.now();
+    let deltaAccumulator = 0;
+
+    const finishLine = {
+      from: { x: startLineX, y: trackCenter.y - 60 },
+      to: { x: startLineX, y: trackCenter.y + 60 },
+    };
+
+    const checkpointAngles = [Math.PI / 2, Math.PI, -Math.PI / 2];
+    const checkpointsHit = new Set();
+
+    function resetLapTracking() {
+      checkpointsHit.clear();
+      car.lastCheckpointAngle = null;
+    }
+
+    function update(dt) {
+      car.lapTime += dt;
+
+      if (keys.shift) {
+        car.targetSpeed = car.maxSpeed;
+        car.speed = Math.min(car.maxSpeed, car.speed + car.accel * dt * 60);
+      } else {
+        car.targetSpeed = 0;
+        car.speed *= car.friction;
+        if (car.speed < 0.05) car.speed = 0;
+      }
+
+      const turnMultiplier = Math.min(1, car.speed / car.maxSpeed);
+      if (keys.left) {
+        car.angle -= car.turnRate * dt * 60 * (0.6 + turnMultiplier * 0.8);
+      }
+      if (keys.right) {
+        car.angle += car.turnRate * dt * 60 * (0.6 + turnMultiplier * 0.8);
+      }
+
+      car.x += Math.cos(car.angle) * car.speed * dt * 60;
+      car.y += Math.sin(car.angle) * car.speed * dt * 60;
+
+      const distanceFromCenter = Math.hypot(car.x - trackCenter.x, car.y - trackCenter.y);
+      const onTrack = distanceFromCenter >= innerRadius + 8 && distanceFromCenter <= outerRadius - 12;
+
+      if (!onTrack) {
+        car.speed *= 0.7;
+        showWarning();
+      } else {
+        hideWarning();
+      }
+
+      detectLap(distanceFromCenter, onTrack);
+    }
+
+    function detectLap(distanceFromCenter, onTrack) {
+      if (!onTrack) {
+        resetLapTracking();
+        return;
+      }
+
+      const angle = Math.atan2(car.y - trackCenter.y, car.x - trackCenter.x);
+
+      checkpointAngles.forEach((checkpointAngle) => {
+        const diff = Math.abs(normalizeAngle(angle - checkpointAngle));
+        if (diff < 0.2) {
+          checkpointsHit.add(checkpointAngle);
+        }
+      });
+
+      const crossesFinish =
+        car.x > finishLine.from.x &&
+        car.x < finishLine.from.x + startLineWidth &&
+        car.y > finishLine.from.y &&
+        car.y < finishLine.to.y &&
+        Math.cos(angle) > 0;
+
+      if (crossesFinish && checkpointsHit.size === checkpointAngles.length) {
+        car.lap += 1;
+        car.bestLap = Math.min(car.bestLap, car.lapTime);
+        car.lapTime = 0;
+        resetLapTracking();
+      }
+    }
+
+    function normalizeAngle(value) {
+      let angle = value;
+      while (angle > Math.PI) angle -= Math.PI * 2;
+      while (angle < -Math.PI) angle += Math.PI * 2;
+      return angle;
+    }
+
+    function showWarning() {
+      warning.style.display = "block";
+    }
+
+    function hideWarning() {
+      warning.style.display = "none";
+    }
+
+    function drawTrack() {
+      ctx.save();
+      ctx.translate(trackCenter.x, trackCenter.y);
+
+      const grd = ctx.createRadialGradient(0, 0, innerRadius - 30, 0, 0, outerRadius + 160);
+      grd.addColorStop(0, "#0f101a");
+      grd.addColorStop(0.45, "#131629");
+      grd.addColorStop(0.75, "#04050b");
+      grd.addColorStop(1, "#010104");
+
+      ctx.fillStyle = grd;
+      ctx.fillRect(-canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+
+      ctx.lineWidth = 26;
+      ctx.strokeStyle = "rgba(42, 255, 248, 0.45)";
+      ctx.beginPath();
+      ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.lineWidth = 70;
+      ctx.strokeStyle = "#373d60";
+      ctx.beginPath();
+      ctx.arc(0, 0, (outerRadius + innerRadius) / 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.lineWidth = outerRadius - innerRadius;
+      ctx.strokeStyle = "#1f243b";
+      ctx.beginPath();
+      ctx.arc(0, 0, (outerRadius + innerRadius) / 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.lineWidth = 4;
+      ctx.setLineDash([18, 12]);
+      ctx.strokeStyle = "#f5f5f5";
+      ctx.beginPath();
+      ctx.arc(0, 0, (outerRadius + innerRadius) / 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+
+      drawFinishLine();
+    }
+
+    function drawFinishLine() {
+      ctx.save();
+      const { from, to } = finishLine;
+      const segments = 10;
+      const segmentHeight = (to.y - from.y) / segments;
+      for (let i = 0; i < segments; i++) {
+        ctx.fillStyle = i % 2 === 0 ? "#ffffff" : "#111";
+        ctx.fillRect(from.x + (i % 2) * 20, from.y + i * segmentHeight, 20, segmentHeight);
+      }
+      ctx.restore();
+    }
+
+    function drawCar() {
+      ctx.save();
+      ctx.translate(car.x, car.y);
+      ctx.rotate(car.angle);
+
+      ctx.fillStyle = "#ff3366";
+      ctx.shadowColor = "rgba(255, 51, 102, 0.6)";
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.moveTo(car.radius + 6, 0);
+      ctx.lineTo(-car.radius, car.radius - 6);
+      ctx.lineTo(-car.radius, -car.radius + 6);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#202230";
+      ctx.fillRect(-car.radius + 4, -car.radius + 2, 8, car.radius * 2 - 4);
+      ctx.fillRect(4, -car.radius + 2, 6, car.radius * 2 - 4);
+
+      ctx.fillStyle = "rgba(66, 135, 245, 0.7)";
+      ctx.fillRect(-car.radius + 4, -car.radius / 2, car.radius, car.radius);
+      ctx.restore();
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawTrack();
+      drawCar();
+      drawTrail();
+      updateHud();
+    }
+
+    const trail = [];
+    function drawTrail() {
+      trail.push({
+        x: car.x,
+        y: car.y,
+        opacity: Math.min(1, car.speed / car.maxSpeed),
+        life: 1,
+      });
+
+      while (trail.length > 80) {
+        trail.shift();
+      }
+
+      ctx.save();
+      ctx.lineWidth = 6;
+      ctx.lineCap = "round";
+      for (let i = 0; i < trail.length - 1; i++) {
+        const p1 = trail[i];
+        const p2 = trail[i + 1];
+        p1.life -= 0.015;
+        if (p1.life <= 0) continue;
+        ctx.strokeStyle = `rgba(255, 51, 102, ${p1.opacity * p1.life})`;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function updateHud() {
+      hudSpeed.textContent = Math.round(car.speed * 62);
+      hudLaps.textContent = car.lap;
+      hudLapTime.textContent = `${car.lapTime.toFixed(1)}s`;
+      hudBestLap.textContent = car.bestLap === Infinity ? "--" : `${car.bestLap.toFixed(1)}s`;
+    }
+
+    function loop(timestamp) {
+      const delta = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+      deltaAccumulator += delta;
+
+      const fixedDt = 1 / 60;
+      while (deltaAccumulator >= fixedDt) {
+        update(fixedDt);
+        deltaAccumulator -= fixedDt;
+      }
+
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    function handleKey(event, isDown) {
+      switch (event.code) {
+        case "ShiftLeft":
+        case "ShiftRight":
+          keys.shift = isDown;
+          break;
+        case "ArrowLeft":
+          keys.left = isDown;
+          break;
+        case "ArrowRight":
+          keys.right = isDown;
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+    }
+
+    window.addEventListener("keydown", (event) => handleKey(event, true));
+    window.addEventListener("keyup", (event) => handleKey(event, false));
+
+    window.addEventListener("blur", () => {
+      keys.shift = keys.left = keys.right = false;
+    });
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
