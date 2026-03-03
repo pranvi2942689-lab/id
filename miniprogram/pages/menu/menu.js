@@ -1,5 +1,29 @@
 const api = require('../../utils/api');
 
+const fallbackMenu = [
+  {
+    id: 'mt-001',
+    name: '珍珠奶茶',
+    description: '经典红茶奶香，搭配Q弹黑糖珍珠',
+    price: 16,
+    image: 'https://dummyimage.com/240x240/f4e8d8/4a3c2f&text=Pearl+Milk+Tea'
+  },
+  {
+    id: 'mt-002',
+    name: '杨枝甘露',
+    description: '芒果西柚风味，清爽不腻',
+    price: 20,
+    image: 'https://dummyimage.com/240x240/fcebc3/4a3c2f&text=Mango+Pomelo'
+  },
+  {
+    id: 'mt-003',
+    name: '抹茶鲜奶',
+    description: '宇治抹茶与鲜奶融合，茶香浓郁',
+    price: 18,
+    image: 'https://dummyimage.com/240x240/e1f1d9/2d4d2f&text=Matcha+Milk'
+  }
+];
+
 Page({
   data: {
     menu: [],
@@ -22,7 +46,10 @@ Page({
       const res = await api.getMenu();
       this.setData({ menu: res.data || [] });
     } catch (error) {
-      wx.showToast({ title: '菜单加载失败', icon: 'none' });
+      const message = api.parseFriendlyError(error);
+      this.setData({ menu: fallbackMenu });
+      wx.showToast({ title: `菜单加载失败，已切换本地菜单`, icon: 'none' });
+      console.error('fetch menu failed:', message, error);
     }
   },
 

@@ -47,7 +47,7 @@ npm start
 2. 选择 `miniprogram/` 目录导入项目。
 3. 在「开发设置」配置 request 合法域名为：`https://1483abb4.r19.vip.cpolar.cn`。
 4. 项目中 `miniprogram/config.js` 已配置：
-   - `apiBaseUrl = https://1483abb4.r19.vip.cpolar.cn`
+   - `apiBaseUrls = [https://1483abb4.r19.vip.cpolar.cn, http://127.0.0.1:3000]`（按顺序自动重试）
    - `cloudEnvId = wxd6d37edecab159ac`
 
 ## 3. API 说明
@@ -88,3 +88,17 @@ npm start
   "code": "wx.login返回的code"
 }
 ```
+
+
+## 4. 菜单加载不出来的排查
+
+1. 先在浏览器打开 `https://1483abb4.r19.vip.cpolar.cn/api/teas`，确认隧道在线。
+2. 如果隧道不在线，小程序会自动回退到 `http://127.0.0.1:3000`。
+3. 确认本地后端已运行：
+
+```bash
+cd backend
+npm start
+```
+
+4. 微信开发者工具里查看 Network，检查请求是否被合法域名拦截。
