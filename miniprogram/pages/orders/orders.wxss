@@ -1,0 +1,20 @@
+.head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+  font-weight: 600;
+}
+
+.status {
+  color: #b46f3b;
+}
+
+.items {
+  margin-top: 8rpx;
+  color: #7f6c59;
+}
+
+.total {
+  margin-top: 12rpx;
+  font-weight: bold;
+}

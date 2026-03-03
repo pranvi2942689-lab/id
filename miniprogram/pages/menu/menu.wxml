@@ -1,0 +1,15 @@
+<view class="container">
+  <block wx:for="{{menu}}" wx:key="id">
+    <view class="card">
+      <image class="drink-image" src="{{item.image}}" mode="aspectFill"/>
+      <view class="title">{{item.name}}</view>
+      <view class="desc">{{item.description}}</view>
+      <view class="footer">
+        <text class="price">¥{{item.price}}</text>
+        <button class="primary-btn" size="mini" bindtap="addToCart" data-item="{{item}}">加入购物车</button>
+      </view>
+    </view>
+  </block>
+
+  <button class="primary-btn jump-btn" bindtap="toCart">去结算（{{cartCount}}）</button>
+</view>

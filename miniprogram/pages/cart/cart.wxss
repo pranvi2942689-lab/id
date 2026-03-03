@@ -1,0 +1,33 @@
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.price {
+  color: #8d7a66;
+  margin-top: 8rpx;
+}
+
+.empty {
+  text-align: center;
+  color: #8d7a66;
+}
+
+.input {
+  border: 1rpx solid #e7d8c8;
+  border-radius: 12rpx;
+  padding: 14rpx;
+  margin-bottom: 16rpx;
+  background: #fffdf9;
+}
+
+.total {
+  font-weight: bold;
+  margin-bottom: 16rpx;
+}

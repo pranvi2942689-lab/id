@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "pages/menu/menu",
+    "pages/cart/cart",
+    "pages/orders/orders"
+  ],
+  "window": {
+    "navigationBarTitleText": "点奶茶",
+    "navigationBarBackgroundColor": "#c39157",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f8f4ef",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}
