@@ -3,16 +3,41 @@
 这是一个可运行的示例项目，包含：
 
 - `miniprogram/`：微信小程序前端（菜单、购物车、订单页）
-- `backend/`：Node.js 原生 HTTP 后端（菜单接口、下单接口、订单接口）
+- `backend/`：Node.js 原生 HTTP 后端（菜单接口、下单接口、订单接口、微信登录换取 openid）
+
+## 你提供的环境信息（已接入）
+
+- API 公网域名（HTTPS）：`https://1483abb4.r19.vip.cpolar.cn`
+- 微信云开发环境 ID：`wxd6d37edecab159ac`
+- 小程序密钥（AppSecret）：**仅可放后端环境变量，不可写入小程序前端代码**
 
 ## 1. 启动后端
 
+先配置环境变量：
+
 ```bash
 cd backend
-npm start
+cp .env.example .env
 ```
 
-默认端口：`3000`
+然后在 `.env` 中填写：
+
+```env
+WECHAT_APP_ID=你的小程序AppID
+WECHAT_APP_SECRET=你的小程序AppSecret
+PORT=3000
+```
+
+> 注意：本项目不会在前端存储 `AppSecret`，避免密钥泄漏。
+
+运行服务：
+
+```bash
+cd backend
+export WECHAT_APP_ID="你的AppID"
+export WECHAT_APP_SECRET="你的AppSecret"
+npm start
+```
 
 健康检查：`GET http://127.0.0.1:3000/health`
 
@@ -20,8 +45,10 @@ npm start
 
 1. 打开微信开发者工具。
 2. 选择 `miniprogram/` 目录导入项目。
-3. 在「详情 -> 本地设置」里勾选不校验合法域名（开发环境）。
-4. 确保后端在本机 `127.0.0.1:3000` 运行。
+3. 在「开发设置」配置 request 合法域名为：`https://1483abb4.r19.vip.cpolar.cn`。
+4. 项目中 `miniprogram/config.js` 已配置：
+   - `apiBaseUrl = https://1483abb4.r19.vip.cpolar.cn`
+   - `cloudEnvId = wxd6d37edecab159ac`
 
 ## 3. API 说明
 
@@ -50,3 +77,14 @@ npm start
 
 ### GET `/api/orders`
 获取订单列表。
+
+### POST `/api/wechat/code2session`
+小程序 `wx.login` 获取 `code` 后，后端调用微信接口换取 `openid/session_key`。
+
+请求体：
+
+```json
+{
+  "code": "wx.login返回的code"
+}
+```

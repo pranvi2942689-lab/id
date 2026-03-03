@@ -1,8 +1,11 @@
 const http = require('http');
+const https = require('https');
 const { URL } = require('url');
 const { getTeas, getOrders, createOrder } = require('./db');
 
 const port = process.env.PORT || 3000;
+const wechatAppId = process.env.WECHAT_APP_ID || '';
+const wechatAppSecret = process.env.WECHAT_APP_SECRET || '';
 
 function sendJson(res, statusCode, payload) {
   const body = JSON.stringify(payload);
@@ -36,6 +39,32 @@ function parseBody(req) {
   });
 }
 
+function fetchCode2Session(code) {
+  return new Promise((resolve, reject) => {
+    const requestUrl = new URL('https://api.weixin.qq.com/sns/jscode2session');
+    requestUrl.searchParams.set('appid', wechatAppId);
+    requestUrl.searchParams.set('secret', wechatAppSecret);
+    requestUrl.searchParams.set('js_code', code);
+    requestUrl.searchParams.set('grant_type', 'authorization_code');
+
+    https
+      .get(requestUrl, (resp) => {
+        let body = '';
+        resp.on('data', (chunk) => {
+          body += chunk;
+        });
+        resp.on('end', () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch (error) {
+            reject(new Error('微信接口返回非 JSON 数据'));
+          }
+        });
+      })
+      .on('error', reject);
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     sendJson(res, 204, {});
@@ -45,7 +74,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    sendJson(res, 200, { ok: true });
+    sendJson(res, 200, { ok: true, wechatConfigured: Boolean(wechatAppId && wechatAppSecret) });
     return;
   }
 
@@ -80,6 +109,38 @@ const server = http.createServer(async (req, res) => {
       return;
     } catch (error) {
       sendJson(res, 400, { message: '请求体 JSON 格式错误' });
+      return;
+    }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/wechat/code2session') {
+    try {
+      const { code } = await parseBody(req);
+      if (!code) {
+        sendJson(res, 400, { message: '缺少 code' });
+        return;
+      }
+      if (!wechatAppId || !wechatAppSecret) {
+        sendJson(res, 500, { message: '服务端未配置 WECHAT_APP_ID / WECHAT_APP_SECRET' });
+        return;
+      }
+
+      const result = await fetchCode2Session(code);
+      if (result.errcode) {
+        sendJson(res, 400, { message: result.errmsg || '微信登录失败', errcode: result.errcode });
+        return;
+      }
+
+      sendJson(res, 200, {
+        data: {
+          openid: result.openid,
+          session_key: result.session_key,
+          unionid: result.unionid || null
+        }
+      });
+      return;
+    } catch (error) {
+      sendJson(res, 500, { message: '微信登录请求失败' });
       return;
     }
   }

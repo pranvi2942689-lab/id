@@ -1,4 +1,6 @@
-const BASE_URL = 'http://127.0.0.1:3000';
+const config = require('../config');
+
+const BASE_URL = config.apiBaseUrl;
 
 function request(url, method = 'GET', data) {
   return new Promise((resolve, reject) => {
@@ -27,5 +29,8 @@ module.exports = {
   },
   getOrders() {
     return request('/api/orders');
+  },
+  code2Session(code) {
+    return request('/api/wechat/code2session', 'POST', { code });
   }
 };
