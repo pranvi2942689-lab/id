@@ -1,0 +1,22 @@
+<view class="container">
+  <view wx:if="{{cart.length === 0}}" class="card empty">购物车还是空的，先去选一杯奶茶吧～</view>
+
+  <block wx:for="{{cart}}" wx:key="id">
+    <view class="card row">
+      <view>
+        <view class="title">{{item.name}}</view>
+        <view class="price">¥{{item.price}} × {{item.quantity}}</view>
+      </view>
+      <button size="mini" data-id="{{item.id}}" bindtap="decrease">-1</button>
+    </view>
+  </block>
+
+  <view wx:if="{{cart.length > 0}}" class="card">
+    <input class="input" placeholder="取餐人姓名" value="{{customerName}}" bindinput="onNameChange" />
+    <input class="input" placeholder="取餐时间（如 18:30）" value="{{pickupTime}}" bindinput="onTimeChange" />
+    <view class="total">合计：¥{{totalPrice}}</view>
+    <button class="primary-btn" bindtap="submitOrder">提交订单</button>
+  </view>
+
+  <button class="primary-btn" bindtap="toOrders">查看历史订单</button>
+</view>

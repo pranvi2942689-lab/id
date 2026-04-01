@@ -1,0 +1,20 @@
+<view class="container">
+  <view wx:if="{{orders.length === 0}}" class="card">暂无订单</view>
+
+  <block wx:for="{{orders}}" wx:key="id">
+    <view class="card">
+      <view class="head">
+        <text>订单号：{{item.id}}</text>
+        <text class="status">{{item.status}}</text>
+      </view>
+      <view>取餐人：{{item.customerName}}</view>
+      <view>取餐时间：{{item.pickupTime}}</view>
+      <view class="items">
+        <block wx:for="{{item.items}}" wx:key="id">
+          <view>{{item.name}} × {{item.quantity}}</view>
+        </block>
+      </view>
+      <view class="total">总价：¥{{item.totalPrice}}</view>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,10 @@
+{
+  "name": "milk-tea-backend",
+  "version": "1.0.0",
+  "description": "微信点奶茶小程序后端",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/db.js"
+  }
+}
